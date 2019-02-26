@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
+import re
 
 from sklearn.datasets import fetch_20newsgroups
+
 
 # Loads newsgroup 'train' or 'test' data and arranges into dataframe
 def data_to_df(subset):
@@ -13,12 +15,13 @@ def data_to_df(subset):
 	
 	# Join the actual source names instead of source codes so that we can discen class things
 	data_df = data_df.merge(pd.DataFrame(data['target_names'], 
-								   columns=['source']).reset_index(),   # New newsgroup name column called 'source'
-								   how='left', 
-								   left_on = 'target', 
-								   right_on='index').drop('index', axis = 1)
+							columns=['source']).reset_index(),   # New newsgroup name column called 'source'
+							how='left', 
+							left_on = 'target', 
+							right_on='index').drop('index', axis = 1)
 
 	return data_df
+
 
 def retrieve_data():
 	train = data_to_df('train')
@@ -31,8 +34,29 @@ def retrieve_data():
 
 	return data
 
+
+# Generalized cleaning method to be applied for each input string
+def clean_string(string):
+	string = re.sub('\\n(\\n)+', '\\n', string) # Remove empty lines
+	string = re.sub('\\n', ' ', string) # Replace newlines with spaces
+	string = re.sub(' ( )+', '', string) # Remove duplicate spaces
+	string = string.replace('\t', '') # Remove tabs
+	return string.strip()
+
+
+# Tokenizes a cleaned string
+def tokenize_string(string):
+	return string.split()
+
+
 def main():
+	# Retrieves DataFrame of train and test data with the columns:
+	# ['data', 'filenames', 'target_names', 'target', 'source', 'partition']
 	data = retrieve_data()
+
+	data.data = data.data.apply(clean_string)
+
+	data.to_pickle('../data/newsgroup.pkl')
 
 if __name__ == "__main__":
 	main()
