@@ -44,11 +44,6 @@ def clean_string(string):
 	return string.strip()
 
 
-# Tokenizes a cleaned string
-def tokenize_string(string):
-	return string.split()
-
-
 def main():
 	# Retrieves DataFrame of train and test data with the columns:
 	# ['data', 'filenames', 'target_names', 'target', 'source', 'partition']
