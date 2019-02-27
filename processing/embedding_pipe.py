@@ -34,13 +34,37 @@ def create_embeddings(texts, load_pretrained=False):
 	return model
 
 
+# Takes a group of texts and trained model, then calculates the document vector for each text by averageing words features
+def calculate_text_features(texts, model):
+	"""
+	Input: group of tokenized texts and trained Word2Vec model
+	Output: List of document features size len(texts) by config.DIM_EMBEDDING
+	where each document feature set is of size config.DIM_EMBEDDING
+	"""
+
+	features = [np.mean([model.wv[token] for token in text], axis = 0) for text in texts]
+	
+	return features
+
+
 def main():
 	# Columns: ['data', 'filenames', 'target_names', 'target', 'source', 'partition']
 	data = pd.read_pickle('../data/newsgroup.pkl')
 
-	temp = data.iloc[0:10]['data'].apply(tokenize_strings).tolist()
+	# Extract tokenized text from dataframe
+	texts = data['data'].apply(tokenize_strings).tolist()
 	
-	create_embeddings(temp)
+	# Train Word2Vec model
+	model = create_embeddings(texts)
+
+	# Calculate the document vectors for each document
+	doc_vectors = calculate_text_features(texts, model)
+
+	# Add document vectors to dataframe as column 'doc_vector'
+	data['doc_vector'] = doc_vectors
+
+	# Save dataframe to new pickle file
+	data.to_pickle('../data/newsgroup_vectors.pkl')
 
 
 if __name__ == "__main__":

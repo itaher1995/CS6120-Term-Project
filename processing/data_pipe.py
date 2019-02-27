@@ -30,7 +30,7 @@ def retrieve_data():
 	test = data_to_df('test')
 	test['partition'] = 'test'   # Add partition to merge dataframes while keeping info seperate
 
-	data = pd.concat([train, test], axis = 0)
+	data = pd.concat([train, test], axis = 0).reset_index(drop=True)
 
 	return data
 
