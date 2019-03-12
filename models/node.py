@@ -2,19 +2,55 @@
 Creates NODE model based on torchdiffeq for project document classification
 """
 
-# Import right packages
-from torchdiffeq import odeint_adjoint
+import pandas as pd
 import numpy as np
+import pickle
+from time import time
+
+# Import right packages
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-import pandas as pd
+
+from torchdiffeq import odeint_adjoint
+
 # Get batch data
 
 # Create ODE network based on pytorch objects in ODEfunc class
 	# Needs to have at least __init__ and forward functions
 	# Where __init__ has the network declaration and forward has the forward propogation
+
+# Sets to GPU if possible
+# Might be wrong device name for gpu
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+
+# Loads features and puts them into tensor form
+def load_features():
+
+	print('Loading data...')
+
+	start = time()
+
+	# Loads Sentence vectors
+	with open('data/sent_embds.pkl', 'rb') as f:
+		feature_vecs = pickle.load(f)
+
+	# Gets metadata, including source (aka Y data)
+	metadata = pd.read_pickle('data/newsgroup_map.pkl')
+
+	# Stores feature vectors in tensor
+	X = torch.tensor(feature_vecs).to(device)
+
+	# Gets source targets and stores in tensor
+	Y = [[v] for v in metadata.target.tolist()]
+	Y = torch.tensor(y).to(device)
+
+	print('Data loaded in:', (time() - start) / 60, 'min')
+
+	return X, Y
+
 
 class TemporalConvBlock(nn.Module):
     def __init__(self):
@@ -158,7 +194,7 @@ class convNODENET:
 	# Used saved model to test things
     
 if __name__=='__main__':
-    features = pd.DataFrame([[np.random.rand() for i in range(100)] for j in range(10)])
-    response = pd.Series([np.random.randint(0,3) for i in range(10)])
+    features = torch.tensor([[np.random.rand() for i in range(100)] for j in range(10)]).to(device)
+    response = torch.tensor([np.random.randint(0,3) for i in range(10)]).to(device)
     convNode = convNODENET(features.shape[1],batch_size=1,epochs=10,lr=0.001,batches_per_epoch=1,num_classes=10,dropout=0)
     convNode.fit(features,response)
