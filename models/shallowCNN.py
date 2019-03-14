@@ -71,9 +71,9 @@ class ShallowCNNModel:
             optimizer.step()
     def predict(self,X):
         predX = X.to(device)
-        proba = self.model(predX)
+        prob = self.model(predX)
 
-        return proba
+        return prob
 
 if __name__=='__main__':
     print('Taken care of')
