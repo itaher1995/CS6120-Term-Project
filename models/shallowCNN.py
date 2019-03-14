@@ -12,6 +12,15 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 import torch
 
+import sys
+sys.path.append("..")
+import data_util
+
+
+# Sets to GPU if possible
+# Might be wrong device name for gpu
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = 'cpu'
 
 class ShallowCNN(nn.Module):
     
@@ -41,28 +50,30 @@ class ShallowCNNModel:
         self.lr = lr
         self.batch_size = batch_size
         self.epochs=epochs
-        self.model = ShallowCNN(input_size,kern1,kern2,kern3,num_filters,num_fc).cuda()
+        self.model = ShallowCNN(input_size,kern1,kern2,kern3,num_filters,num_fc).to(device)
+
+        loader = data_util.load_data()
+        data_iter = data_util.inf_generator(loader)
+
     def fit(self,X,y):
         optimizer = optim.SGD(self.model.parameters(),lr=self.lr,momentum=0.4)
         loss = nn.CrossEntropyLoss() # cross-entropy loss
         for i in range(self.epochs):
-            X_batch = X.sample(n=self.batch_size)
-            y_batch = y[X_batch.index]
+            X, Y = data_iter.__next__()
 
-            inputX = Variable(torch.FloatTensor([X_batch.values]), requires_grad=True).cuda() # have to convert to tensor
-            inputY = Variable(torch.FloatTensor([y_batch.values]), requires_grad=False).cuda()
+            X = X.to(device) # have to convert to tensor
+            Y = Y.to(device)
             optimizer.zero_grad()
-            y_pred = self.model(inputX)
-            output = loss(y_pred, inputY)
+            y_pred = self.model(X)
+            output = loss(y_pred, Y)
 
             output.backward()
             optimizer.step()
     def predict(self,X):
-        predX = Variable(torch.FloatTensor(X.values)).cuda()
+        predX = X.to(device)
         proba = self.model(predX)
 
         return proba
 
 if __name__=='__main__':
-    DATALOC = 'C:/Users/ibiyt/Desktop/GitHub/CS6120-Term-Project/data'
-    df = pd.read_pickle(DATALOC+'/'+'newsgroup_vectors.pkl')
+    print('Taken care of')
