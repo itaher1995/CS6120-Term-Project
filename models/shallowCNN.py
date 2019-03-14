@@ -20,7 +20,7 @@ import data_util
 # Sets to GPU if possible
 # Might be wrong device name for gpu
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-device = 'cpu'
+#device = 'cpu'
 
 class ShallowCNN(nn.Module):
     
