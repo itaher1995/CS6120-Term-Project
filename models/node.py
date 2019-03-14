@@ -106,17 +106,17 @@ class ODEFunc(nn.Module):
         # m 2 convblock max pool groups
         self.convBlocks1 = [TemporalConvBlock(num_inputs=self.feature_maps[0],num_filters=self.feature_maps[0],kernel_size=kernel_size) for i in range(self.numConvBlocks)]
 
-        #self.maxpool1 = nn.MaxPool1d(kernel_size=kernel_size,stride=2) # Use max pooling with stride 2 and size 3
+        self.maxpool1 = nn.MaxPool1d(kernel_size=kernel_size,stride=2) # Use max pooling with stride 2 and size 3
         
         self.convBlocks2 = [TemporalConvBlock(num_inputs=self.feature_maps[0],num_filters=self.feature_maps[1],kernel_size=kernel_size) for i in range(self.numConvBlocks)]
 
-        #self.maxpool2 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
+        self.maxpool2 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
         
         self.convBlocks3 = [TemporalConvBlock(num_inputs=self.feature_maps[1],num_filters=self.feature_maps[2],kernel_size=kernel_size) for i in range(self.numConvBlocks)]
         
-        #self.maxpool3 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
+        self.maxpool3 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
         
-        #self.maxpool4 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
+        self.maxpool4 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
         
         # final 2 convblock and then k-max pool
         
@@ -133,25 +133,25 @@ class ODEFunc(nn.Module):
         
         for i in range(self.numConvBlocks):
             x=self.convBlocks1[i](x)
-        #x = self.maxpool1(x)
+        x = self.maxpool1(x)
         
         for i in range(self.numConvBlocks):
             x=self.convBlocks2[i](x)
         
-        #x = self.maxpool2(x)
+        x = self.maxpool2(x)
         
         for i in range(self.numConvBlocks):
             x=self.convBlocks3[i](x)
         
-        #x = self.maxpool3(x)
+        x = self.maxpool3(x)
         
         for i in range(self.numConvBlocks):
             x = self.convBlocks4[i](x)
          
-        #x = self.maxpool4(x)    
+        x = self.maxpool4(x)    
         #x = kmax_pooling(x, self.feature_maps[3], 8)
         
-        #x = x.view(x.size(0), -1)
+        x = x.view(x.size(0), -1)
         
         return x
 
@@ -222,16 +222,16 @@ class convNODENET:
 
             # inputX = Variable(torch.FloatTensor([X_batch.values]), requires_grad=True).to(device)#.cuda() # have to convert to tensor
             # inputY = Variable(torch.FloatTensor([y_batch.values]), requires_grad=False).to(device)#.cuda()
-            inputX = torch.FloatTensor(X_batch.values).to(device)#.cuda() # have to convert to tensor
+            inputX = torch.FloatTensor([X_batch.values]).to(device)#.cuda() # have to convert to tensor
             inputY = torch.FloatTensor(y_batch).long().to(device)#.cuda()
 
             optimizer.zero_grad()
             
             logits = self.model(inputX)
-            print(logits)
+            print(logits[0])
             print(inputY)
             
-            loss = criterion(logits, inputY)
+            loss = criterion(logits[0], inputY)
     
             self.odeBlock[0].nfe = 0
     
