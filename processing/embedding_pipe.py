@@ -129,8 +129,11 @@ def main():
 		# Calculate and retrieve avereage setnence embeddings
 		embds = get_doc_embeddings(text_sents, max_doc_sents, model)
 
+		# Zips embeddings and classes for iterater later
+		embds_zip = [[embds[i], data['target'].tolist()[i]] for i in range(len(embds))]
+
 		with open('../data/sent_embds.pkl', 'wb') as f:
-			pickle.dump(embds, f)
+			pickle.dump(embds_zip, f)
 
 		# Append index map
 		data['idx_map'] = list(range(len(embds)))
