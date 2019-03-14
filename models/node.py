@@ -65,6 +65,7 @@ def onehot_encoder(y, num_classes):
 
 	# Assign appropriate class as 1
 	onehot_vector[y] = 1
+
 	return onehot_vector
 
 
@@ -105,17 +106,17 @@ class ODEFunc(nn.Module):
         # m 2 convblock max pool groups
         self.convBlocks1 = [TemporalConvBlock(num_inputs=self.feature_maps[0],num_filters=self.feature_maps[0],kernel_size=kernel_size) for i in range(self.numConvBlocks)]
 
-        self.maxpool1 = nn.MaxPool1d(kernel_size=kernel_size,stride=2) # Use max pooling with stride 2 and size 3
+        #self.maxpool1 = nn.MaxPool1d(kernel_size=kernel_size,stride=2) # Use max pooling with stride 2 and size 3
         
         self.convBlocks2 = [TemporalConvBlock(num_inputs=self.feature_maps[0],num_filters=self.feature_maps[1],kernel_size=kernel_size) for i in range(self.numConvBlocks)]
 
-        self.maxpool2 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
+        #self.maxpool2 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
         
         self.convBlocks3 = [TemporalConvBlock(num_inputs=self.feature_maps[1],num_filters=self.feature_maps[2],kernel_size=kernel_size) for i in range(self.numConvBlocks)]
         
-        self.maxpool3 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
+        #self.maxpool3 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
         
-        self.maxpool4 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
+        #self.maxpool4 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
         
         # final 2 convblock and then k-max pool
         
@@ -132,25 +133,25 @@ class ODEFunc(nn.Module):
         
         for i in range(self.numConvBlocks):
             x=self.convBlocks1[i](x)
-        x = self.maxpool1(x)
+        #x = self.maxpool1(x)
         
         for i in range(self.numConvBlocks):
             x=self.convBlocks2[i](x)
         
-        x = self.maxpool2(x)
+        #x = self.maxpool2(x)
         
         for i in range(self.numConvBlocks):
             x=self.convBlocks3[i](x)
         
-        x = self.maxpool3(x)
+        #x = self.maxpool3(x)
         
         for i in range(self.numConvBlocks):
             x = self.convBlocks4[i](x)
          
-        x = self.maxpool4(x)    
+        #x = self.maxpool4(x)    
         #x = kmax_pooling(x, self.feature_maps[3], 8)
         
-        x = x.view(x.size(0), -1)
+        #x = x.view(x.size(0), -1)
         
         return x
 
@@ -166,7 +167,6 @@ class ODEBlock(nn.Module): # adapted from rtqichen
         self.integration_time = self.integration_time.type_as(x)
         
         out = odeint_adjoint(self.odefunc, x, self.integration_time)
-        print('Here')
         return out[1]
 
 
@@ -193,9 +193,9 @@ class convNODENET:
         self.num_classes = num_classes
 
         self.odeBlock = ODEBlock(ODEFunc(input_size=input_size,numConvBlocks=numConvBlocks,kernel_size=kernel_size,feature_maps=feature_maps,embedding_dim=embedding_dim,num_classes=num_classes))
-
+        
         # Fully connected layers for output of function
-        fc_layers = [nn.Linear(config.DIM_EMBEDDING,256), nn.Linear(256,256), nn.Linear(256,num_classes), nn.Softmax()]
+        fc_layers = [nn.Linear(config.DIM_EMBEDDING,256), nn.Linear(256,256), nn.Linear(256,num_classes)]
 
         # Initialize end to end model
         self.model = nn.Sequential(self.odeBlock, *fc_layers).to(device)
@@ -222,12 +222,14 @@ class convNODENET:
 
             # inputX = Variable(torch.FloatTensor([X_batch.values]), requires_grad=True).to(device)#.cuda() # have to convert to tensor
             # inputY = Variable(torch.FloatTensor([y_batch.values]), requires_grad=False).to(device)#.cuda()
-            inputX = torch.FloatTensor([X_batch.values]).to(device)#.cuda() # have to convert to tensor
+            inputX = torch.FloatTensor(X_batch.values).to(device)#.cuda() # have to convert to tensor
             inputY = torch.FloatTensor(y_batch).long().to(device)#.cuda()
-            
+
             optimizer.zero_grad()
             
             logits = self.model(inputX)
+            print(logits)
+            print(inputY)
             
             loss = criterion(logits, inputY)
     
@@ -239,7 +241,8 @@ class convNODENET:
             self.odeBlock[0].nfe = 0
             
     def predict(self,X):
-        predX = Variable(torch.FloatTensor(X.values)).to(device)
+        #predX = Variable(torch.FloatTensor(X.values)).to(device)
+        predX = torch.FloatTensor(X.values).to(device)
         prob = self.model(predX)
         return prob
         
@@ -247,7 +250,7 @@ class convNODENET:
 if __name__=='__main__':
     num_classes = 10
     features = pd.DataFrame([[np.random.rand() for i in range(100)] for j in range(10)])
-    response = pd.Series([np.random.randint(0,3) for i in range(10)])
+    response = pd.Series([np.random.randint(0,9) for i in range(10)])
 
     convNode = convNODENET(features.shape[1],batch_size=1,epochs=10,lr=0.001,batches_per_epoch=1,num_classes=num_classes,numConvBlocks=1,kernel_size=3,feature_maps=[64,128,256,config.DIM_EMBEDDING],embedding_dim=config.DIM_EMBEDDING)
     convNode.fit(features,response)
