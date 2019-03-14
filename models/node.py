@@ -17,6 +17,10 @@ from torch.autograd import Variable
 
 from torchdiffeq import odeint_adjoint
 
+import sys
+sys.path.append("..")
+import config   # Read in hyperparameters from config so that we can control for input size in networks later
+
 # Get batch data
 
 # Create ODE network based on pytorch objects in ODEfunc class
@@ -26,6 +30,7 @@ from torchdiffeq import odeint_adjoint
 # Sets to GPU if possible
 # Might be wrong device name for gpu
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = 'cpu'
 
 
 # Loads features and puts them into tensor form
@@ -52,11 +57,16 @@ def load_features():
 	print('Data loaded in:', (time() - start) / 60, 'min')
 
 	return X, Y
-# Get batch data
 
-# Create ODE network based on pytorch objects in ODEfunc class
-	# Needs to have at least __init__ and forward functions
-	# Where __init__ has the network declaration and forward has the forward propogation
+# Encodes y values into onehot vector
+def onehot_encoder(y, num_classes):
+	# Intialize classes
+	onehot_vector = np.zeros(num_classes)
+
+	# Assign appropriate class as 1
+	onehot_vector[y] = 1
+	return onehot_vector
+
 
 class TemporalConvBlock(nn.Module):
     def __init__(self, num_inputs,num_filters,kernel_size):
@@ -111,10 +121,6 @@ class ODEFunc(nn.Module):
         
         self.convBlocks4 = [TemporalConvBlock(num_inputs=self.feature_maps[2],num_filters=self.feature_maps[3],kernel_size=kernel_size) for i in range(numConvBlocks)]
         
-        # 3 fc layers with relu
-        self.fc1 = nn.Linear(512,256)
-        self.fc2 = nn.Linear(256,256)
-        self.fc3 = nn.Linear(256,num_classes)
 
     def forward(self, t, x):
         
@@ -146,12 +152,6 @@ class ODEFunc(nn.Module):
         
         x = x.view(x.size(0), -1)
         
-        x = self.fc1(x)
-        
-        x = self.fc2(x)
-        
-        x = self.fc3(x) # this will have softmax applied
-        
         return x
 
 class ODEBlock(nn.Module): # adapted from rtqichen
@@ -166,7 +166,7 @@ class ODEBlock(nn.Module): # adapted from rtqichen
         self.integration_time = self.integration_time.type_as(x)
         
         out = odeint_adjoint(self.odefunc, x, self.integration_time)
-        
+        print('Here')
         return out[1]
 
 
@@ -193,13 +193,17 @@ class convNODENET:
         self.num_classes = num_classes
 
         self.odeBlock = ODEBlock(ODEFunc(input_size=input_size,numConvBlocks=numConvBlocks,kernel_size=kernel_size,feature_maps=feature_maps,embedding_dim=embedding_dim,num_classes=num_classes))
-        self.model = nn.Sequential(self.odeBlock,nn.Softmax())#.cuda()
+
+        # Fully connected layers for output of function
+        fc_layers = [nn.Linear(config.DIM_EMBEDDING,256), nn.Linear(256,256), nn.Linear(256,num_classes), nn.Softmax()]
+
+        # Initialize end to end model
+        self.model = nn.Sequential(self.odeBlock, *fc_layers).to(device)
+
+
     def fit(self,X,y):
 
-        
-        
-        criterion = nn.CrossEntropyLoss()
-        
+        criterion = nn.CrossEntropyLoss().to(device)
         
         lr_fn = learning_rate_with_decay(
         self.lr, self.batch_size, batch_denom=128, batches_per_epoch=self.batches_per_epoch, boundary_epochs=[60, 100, 140],
@@ -214,10 +218,13 @@ class convNODENET:
                 param_group['lr'] = lr_fn(itr)
 
             X_batch = X.sample(n=self.batch_size)
-            y_batch = y[X_batch.index]
+            y_batch = [onehot_encoder(v,10) for v in y[X_batch.index].values]
 
-            inputX = Variable(torch.FloatTensor([X_batch.values]), requires_grad=True)#.cuda() # have to convert to tensor
-            inputY = Variable(torch.FloatTensor([y_batch.values]), requires_grad=False)#.cuda()
+            # inputX = Variable(torch.FloatTensor([X_batch.values]), requires_grad=True).to(device)#.cuda() # have to convert to tensor
+            # inputY = Variable(torch.FloatTensor([y_batch.values]), requires_grad=False).to(device)#.cuda()
+            inputX = torch.FloatTensor([X_batch.values]).to(device)#.cuda() # have to convert to tensor
+            inputY = torch.FloatTensor(y_batch).long().to(device)#.cuda()
+            
             optimizer.zero_grad()
             
             logits = self.model(inputX)
@@ -232,24 +239,15 @@ class convNODENET:
             self.odeBlock[0].nfe = 0
             
     def predict(self,X):
-        predX = Variable(torch.FloatTensor(X.values)).cuda()
-        proba = self.model(predX)
-        return proba
+        predX = Variable(torch.FloatTensor(X.values)).to(device)
+        prob = self.model(predX)
+        return prob
         
 
-# Some type of reporting class, if we're modeling after NODE peoples work
-
-# train funciton
-	# Initialize layers based one ODEfunc
-	# Define loss criterion and optimizer
-	# Leverage odeint (main funciton from project) to calculate prediction using time as the integral intervales (I still don't perfectly understand)
-
-# test function
-	# Used saved model to test things
-    
 if __name__=='__main__':
+    num_classes = 10
     features = pd.DataFrame([[np.random.rand() for i in range(100)] for j in range(10)])
     response = pd.Series([np.random.randint(0,3) for i in range(10)])
 
-    convNode = convNODENET(features.shape[1],batch_size=1,epochs=10,lr=0.001,batches_per_epoch=1,num_classes=10,numConvBlocks=1,kernel_size=3,feature_maps=[64,128,256,512],embedding_dim=100)
+    convNode = convNODENET(features.shape[1],batch_size=1,epochs=10,lr=0.001,batches_per_epoch=1,num_classes=num_classes,numConvBlocks=1,kernel_size=3,feature_maps=[64,128,256,config.DIM_EMBEDDING],embedding_dim=config.DIM_EMBEDDING)
     convNode.fit(features,response)
