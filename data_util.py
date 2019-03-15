@@ -8,14 +8,19 @@ from torch.utils.data import DataLoader
 import config
 
 # Loads features and puts them into tensor form
-def load_data():
+# Takes train or test partition
+def load_data(partition='train'):
 
 
 	# Loads Sentence vectors
 	with open('data/sent_embds.pkl', 'rb') as f:
 		data = pickle.load(f)
+		# Gets metadata
+		metadata = pd.read_pickle('data/newsgroup_map.pkl')
 
-	dataloader = DataLoader(data, batch_size=config.BATCH_SIZE)	
+	idx_subset = metadata[metadata.partition == partition]['idx_map'].tolist()
+
+	dataloader = DataLoader(np.array(data)[idx_subset].tolist(), batch_size=config.BATCH_SIZE)	
 
 	return dataloader
 
