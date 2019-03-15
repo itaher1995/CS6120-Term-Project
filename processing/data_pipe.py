@@ -39,7 +39,7 @@ def retrieve_data():
 def clean_string(string):
 	string = re.sub('\\n(\\n)+', '\\n', string) # Remove empty lines
 	string = re.sub('\\n', ' ', string) # Replace newlines with spaces
-	string = re.sub(' ( )+', '', string) # Remove duplicate spaces
+	string = re.sub(' ( )+', ' ', string) # Remove duplicate spaces
 	string = string.replace('\t', '') # Remove tabs
 	return string.strip()
 
