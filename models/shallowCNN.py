@@ -53,13 +53,13 @@ class ShallowCNNModel:
         self.model = ShallowCNN(input_size,kern1,kern2,kern3,num_filters,num_fc).to(device)
 
         loader = data_util.load_data()
-        data_iter = data_util.inf_generator(loader)
+        self.data_iter = data_util.inf_generator(loader)
 
     def fit(self,X,y):
         optimizer = optim.SGD(self.model.parameters(),lr=self.lr,momentum=0.4)
         loss = nn.CrossEntropyLoss() # cross-entropy loss
         for i in range(self.epochs):
-            X, Y = data_iter.__next__()
+            X, Y = self.data_iter.__next__()
 
             X = X.to(device) # have to convert to tensor
             Y = Y.to(device)
@@ -76,4 +76,4 @@ class ShallowCNNModel:
         return prob
 
 if __name__=='__main__':
-    print('Taken care of')
+    ShallowCNNModel(batch_size=config.batch_size,0.001,10,_,1,2,3,100,200)
