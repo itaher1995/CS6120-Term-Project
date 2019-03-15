@@ -52,6 +52,9 @@ class ShallowCNNModel:
         self.epochs=epochs
         self.model = ShallowCNN(input_size,kern1,kern2,kern3,num_filters,num_fc).to(device)
 
+        if config.LOAD_MODEL:
+            self.model.load_state_dict(torch.load('model_weights/shallowCNN.pt'))
+
         loader = data_util.load_data()
         self.data_iter = data_util.inf_generator(loader)
 
@@ -69,6 +72,9 @@ class ShallowCNNModel:
 
             output.backward()
             optimizer.step()
+
+        torch.save(self.model.state_dict(), 'model_weights/shallowCNN.pt')
+
     def predict(self,X):
         predX = X.to(device)
         prob = self.model(predX)
