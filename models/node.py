@@ -33,7 +33,7 @@ import data_util
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 device = 'cpu'
 
-is_print = False
+is_print = True
 
 # Loads features and puts them into tensor form
 def load_features():
@@ -172,6 +172,10 @@ class ODEBlock(nn.Module): # adapted from rtqichen
         out = odeint_adjoint(self.odefunc, x, self.integration_time)
         if is_print:
             print('pls halp', len(out[1]))
+        print(out[1].shape)
+
+        #out = out[1].view(out[1].size(0),-1).t()
+        #out = out[1].view(out[1].size(-1), 1)
         return out[1]
 
 
@@ -188,7 +192,16 @@ def learning_rate_with_decay(lr,batch_size, batch_denom, batches_per_epoch, boun
 
     return learning_rate_fn
 
-        
+class Flatten(nn.Module):
+
+    def __init__(self):
+        super(Flatten, self).__init__()
+
+    def forward(self, x):
+        shape = torch.prod(torch.tensor(x.shape[1:])).item()
+        return x.view(-1, shape)
+
+
 class convNODENET:
     def __init__(self,emb_size,batch_size,lr,epochs,kern1,kern2,kern3,num_filters,num_classes):
         self.batch_size = batch_size
@@ -207,7 +220,8 @@ class convNODENET:
         
         # Fully connected layers for output of function
         fc_layers = [
-            nn.Linear(in_features = num_filters*3, out_features = num_classes)#,
+            Flatten(),
+            nn.Linear(in_features = 77100, out_features = num_classes)#,
             #F.log_softmax(dim=num_classes)
         ]
 
@@ -233,6 +247,8 @@ class convNODENET:
         
         for itr in range(self.epochs * self.batches_per_epoch):
             
+            optimizer.zero_grad()
+
             X, y = data_iter.__next__()
             X=[x.numpy()[0] for x in X] 
 
@@ -251,22 +267,20 @@ class convNODENET:
             #y = y#.to(device)
 
             X = X.unsqueeze(1)
-
-            optimizer.zero_grad()
             
             logits = self.model(X)
-            print(len(logits))
+            print(logits.shape)
             print(logits[0])
-            print(y)
+            print(y.shape)
             
-            loss = criterion(logits[0], y)
+            loss = criterion(logits, y)
     
-            self.odeBlock[0].nfe = 0
+            #self.odeBlock[0].nfe = 0
     
             loss.backward()
             optimizer.step()
             
-            self.odeBlock[0].nfe = 0
+            #self.odeBlock[0].nfe = 0
             
     def predict(self,X):
         #predX = Variable(torch.FloatTensor(X.values)).to(device)
