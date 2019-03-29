@@ -20,6 +20,7 @@ from torchdiffeq import odeint_adjoint
 import sys
 sys.path.append("..")
 import config   # Read in hyperparameters from config so that we can control for input size in networks later
+import data_util
 
 # Get batch data
 
@@ -69,91 +70,84 @@ def onehot_encoder(y, num_classes):
 	return onehot_vector
 
 
-class TemporalConvBlock(nn.Module):
-    def __init__(self, num_inputs,num_filters,kernel_size):
-        super().__init__()
-        
-        # Temporal Convolution Layer (kernel size = 3, stride = 1)
-        self.tcl1 = nn.Conv1d(in_channels= num_inputs,out_channels= num_filters,kernel_size = kernel_size)
-        # Temporal Batch Norm
-        self.tbn1 = nn.BatchNorm1d(num_features=num_filters)
-        # ReLU (apply in forward step)
-        
-        # Temporal Convolution Layer (kernel size = 3, stride)
-        self.tcl2 = nn.Conv1d(in_channels=num_filters,out_channels=num_filters,kernel_size=kernel_size)
-        # Temporal Batch Norm
-        self.tbn2 = nn.BatchNorm1d(num_features=num_filters)
-        # ReLU (apply in forward step)
+class ConcatConv2d(nn.Module):
 
-    def forward(self,x):
-        return F.relu(self.tbn2(self.tcl2(F.relu(self.tbn1(self.tcl1(x))))))
+    def __init__(self, dim_in, dim_out, ksize=3, stride=1, padding=0, dilation=1, groups=1, bias=True, transpose=False):
+        super(ConcatConv2d, self).__init__()
+        module = nn.ConvTranspose2d if transpose else nn.Conv2d
+        print(f'dims: {dim_in} {dim_out}')
+        self._layer = module(
+            dim_in + 1, dim_out, kernel_size=ksize, stride=stride, padding=padding, dilation=dilation, groups=groups,
+            bias=bias
+        )
+
+    def forward(self, t, x):
+        print('ConcatConv2d foward xshape', x.shape)
+        tt = torch.ones_like(x[:, :1, :, :]) * t
+        print('ConcatConv2d foward 1', tt.shape)
+        ttx = torch.cat([tt, x], 1)
+        print('ConcatConv2d foward 2', ttx.shape)
+        l = self._layer(ttx)
+        print('Layer ttx')
+        return l
+
 
 class ODEFunc(nn.Module):
     
-    def __init__(self,input_size,numConvBlocks,kernel_size,feature_maps,embedding_dim,num_classes,resnet=False):
+    def __init__(self,emb_size,kern1,kern2,kern3,num_filters,num_classes):
         super().__init__()
         
-        
-        # Start by getting the embedding for a specific sentence
-        self.feature_maps = feature_maps
-        self.numConvBlocks = numConvBlocks
-        
-        self.tempConv1 = nn.Conv1d(in_channels=1,out_channels=self.feature_maps[0],kernel_size=kernel_size)
-        
-        # Start with a temporal convolutional layer with stride 3 and feature maps, X
-        #create n conv blocks with stride 3 and n feature maps
-        # each conv block is two sets of temporal convolutions with size 3 and n feature map, temporal batch norm and relu
-        # m 2 convblock max pool groups
-        self.convBlocks1 = [TemporalConvBlock(num_inputs=self.feature_maps[0],num_filters=self.feature_maps[0],kernel_size=kernel_size) for i in range(self.numConvBlocks)]
+        # self.conv1 = nn.Conv2d(in_channels=1,out_channels=num_filters,kernel_size=[kern1,emb_size])
+        # self.conv2 = nn.Conv2d(in_channels=1,out_channels=num_filters,kernel_size=[kern2,emb_size])
+        # self.conv3 = nn.Conv2d(in_channels=1,out_channels=num_filters,kernel_size=[kern3,emb_size])
 
-        self.maxpool1 = nn.MaxPool1d(kernel_size=kernel_size,stride=2) # Use max pooling with stride 2 and size 3
-        
-        self.convBlocks2 = [TemporalConvBlock(num_inputs=self.feature_maps[0],num_filters=self.feature_maps[1],kernel_size=kernel_size) for i in range(self.numConvBlocks)]
+        print(f'input: {num_filters}, {kern1}')
 
-        self.maxpool2 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
-        
-        self.convBlocks3 = [TemporalConvBlock(num_inputs=self.feature_maps[1],num_filters=self.feature_maps[2],kernel_size=kernel_size) for i in range(self.numConvBlocks)]
-        
-        self.maxpool3 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
-        
-        self.maxpool4 = nn.MaxPool1d(kernel_size=kernel_size,stride=2)
-        
-        # final 2 convblock and then k-max pool
-        
-        self.convBlocks4 = [TemporalConvBlock(num_inputs=self.feature_maps[2],num_filters=self.feature_maps[3],kernel_size=kernel_size) for i in range(numConvBlocks)]
+        self.conv1 = ConcatConv2d(1, num_filters, ksize=[kern1, config.DIM_EMBEDDING])
+        self.conv2 = ConcatConv2d(1, num_filters,ksize=[kern2, config.DIM_EMBEDDING])
+        self.conv3 = ConcatConv2d(1, num_filters,ksize=[kern3, config.DIM_EMBEDDING])
+
+
+          
         
 
     def forward(self, t, x):
+
+        # x1 = torch.squeeze(F.relu(self.conv1(x)),-1)
+        # x2 = torch.squeeze(F.relu(self.conv2(x)),-1)
+        # x3 = torch.squeeze(F.relu(self.conv3(x)),-1)
+        # print(x1.shape)
+
         
-        def kmax_pooling(x, dim, k):
-            index = x.topk(k, dim = dim)[1].sort(dim = dim)[0]
-            return x.gather(dim, index)
+        # x1 = F.max_pool1d(x1,x1.size(2))
+        # x2 = F.max_pool1d(x2,x2.size(2))
+        # x3 = F.max_pool1d(x3,x3.size(2))
+
         
-        x = self.tempConv1(x)
+        # print(x1.shape)
+        # print(x2.shape)
+        # print(x3.shape)
+
+
+
+        # out = torch.cat([x1,x2,x3],2) # shape is (input_size*3,num_filters)
+        # print(out.shape)
+        # out = out.view(out.size(0),-1)
+        # print('1', out.shape)
+        print('conv1')
+        x1 = self.conv1(t, x)
+        print('conv2')
+        x2 = self.conv2(t, x)
+        print('conv3')
+        x3 = self.conv3(t, x)
+
+        out = torch.cat([x1,x2,x3],2) # shape is (input_size*3,num_filters)
+        #out = out.view(out.size(0),-1)
+
+        print('Did out work?', x1.shape)
+        print(out.shape)
         
-        for i in range(self.numConvBlocks):
-            x=self.convBlocks1[i](x)
-        x = self.maxpool1(x)
-        
-        for i in range(self.numConvBlocks):
-            x=self.convBlocks2[i](x)
-        
-        x = self.maxpool2(x)
-        
-        for i in range(self.numConvBlocks):
-            x=self.convBlocks3[i](x)
-        
-        x = self.maxpool3(x)
-        
-        for i in range(self.numConvBlocks):
-            x = self.convBlocks4[i](x)
-         
-        x = self.maxpool4(x)    
-        #x = kmax_pooling(x, self.feature_maps[3], 8)
-        
-        x = x.view(x.size(0), -1)
-        
-        return x
+        return x1
 
 class ODEBlock(nn.Module): # adapted from rtqichen
     def __init__(self, odefunc):
@@ -167,6 +161,7 @@ class ODEBlock(nn.Module): # adapted from rtqichen
         self.integration_time = self.integration_time.type_as(x)
         
         out = odeint_adjoint(self.odefunc, x, self.integration_time)
+        print('pls halp', len(out[1]))
         return out[1]
 
 
@@ -185,53 +180,76 @@ def learning_rate_with_decay(lr,batch_size, batch_denom, batches_per_epoch, boun
 
         
 class convNODENET:
-    def __init__(self,input_size,batch_size,epochs,lr,batches_per_epoch,num_classes,numConvBlocks,kernel_size,feature_maps,embedding_dim):
+    def __init__(self,emb_size,batch_size,lr,epochs,kern1,kern2,kern3,num_filters,num_classes):
         self.batch_size = batch_size
         self.epochs = epochs
         self.lr = lr
-        self.batches_per_epoch = batches_per_epoch
+        self.batches_per_epoch = 1
         self.num_classes = num_classes
 
-        self.odeBlock = ODEBlock(ODEFunc(input_size=input_size,numConvBlocks=numConvBlocks,kernel_size=kernel_size,feature_maps=feature_maps,embedding_dim=embedding_dim,num_classes=num_classes))
+        # Features sizes and dimensions need to be decreased before going into ode layers
+        downsampling_layers = [
+            nn.Conv2d(in_channels=1,out_channels=1,kernel_size=emb_size)
+        ]
+
+        # The structure for the novel ode method
+        odeBlock = ODEBlock(ODEFunc(emb_size,kern1,kern2,kern3,num_filters,num_classes))
         
         # Fully connected layers for output of function
-        fc_layers = [nn.Linear(config.DIM_EMBEDDING,256), nn.Linear(256,256), nn.Linear(256,num_classes)]
+        fc_layers = [
+            nn.Linear(in_features = num_filters*3, out_features = num_classes)#,
+            #F.log_softmax(dim=num_classes)
+        ]
+
+        print(num_filters * 3, num_classes)
 
         # Initialize end to end model
-        self.model = nn.Sequential(self.odeBlock, *fc_layers).to(device)
+        #self.model = nn.Sequential(*downsampling_layers, odeBlock, *fc_layers).to(device)
+        self.model = nn.Sequential(odeBlock, *fc_layers).to(device)
 
 
-    def fit(self,X,y):
+    def fit(self):
+        loader = data_util.load_data()
+        data_iter = data_util.inf_generator(loader)
 
         criterion = nn.CrossEntropyLoss().to(device)
         
         lr_fn = learning_rate_with_decay(
         self.lr, self.batch_size, batch_denom=128, batches_per_epoch=self.batches_per_epoch, boundary_epochs=[60, 100, 140],
         decay_rates=[1, 0.1, 0.01, 0.001]
-    )
+    	)
 
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9)
         
         for itr in range(self.epochs * self.batches_per_epoch):
             
+            X, y = data_iter.__next__()
+            X=[x.numpy()[0] for x in X] 
+
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr_fn(itr)
 
-            X_batch = X.sample(n=self.batch_size)
-            y_batch = [onehot_encoder(v,10) for v in y[X_batch.index].values]
+            #X_batch = X.sample(n=self.batch_size)
+            #y_batch = [onehot_encoder(v,10) for v in y[X_batch.index].values]
 
-            # inputX = Variable(torch.FloatTensor([X_batch.values]), requires_grad=True).to(device)#.cuda() # have to convert to tensor
-            # inputY = Variable(torch.FloatTensor([y_batch.values]), requires_grad=False).to(device)#.cuda()
-            inputX = torch.FloatTensor([X_batch.values]).to(device)#.cuda() # have to convert to tensor
-            inputY = torch.FloatTensor(y_batch).long().to(device)#.cuda()
+            #X = torch.FloatTensor([X_batch.values]).to(device)#.cuda() # have to convert to tensor
+            #Y = torch.FloatTensor(y_batch).long().to(device)#.cuda()
+            X = Variable(torch.FloatTensor([X]), requires_grad=True).to(device) # have to convert to tensor
+    
+            y = Variable(torch.LongTensor([y]), requires_grad=False).to(device)
+            #X = X#.to(device)
+            #y = y#.to(device)
+
+            X = X.unsqueeze(1)
 
             optimizer.zero_grad()
             
-            logits = self.model(inputX)
+            logits = self.model(X)
+            print(len(logits))
             print(logits[0])
-            print(inputY)
+            print(y)
             
-            loss = criterion(logits[0], inputY)
+            loss = criterion(logits[0], y)
     
             self.odeBlock[0].nfe = 0
     
@@ -248,9 +266,5 @@ class convNODENET:
         
 
 if __name__=='__main__':
-    num_classes = 10
-    features = pd.DataFrame([[np.random.rand() for i in range(100)] for j in range(10)])
-    response = pd.Series([np.random.randint(0,9) for i in range(10)])
-
-    convNode = convNODENET(features.shape[1],batch_size=1,epochs=10,lr=0.001,batches_per_epoch=1,num_classes=num_classes,numConvBlocks=1,kernel_size=3,feature_maps=[64,128,256,config.DIM_EMBEDDING],embedding_dim=config.DIM_EMBEDDING)
-    convNode.fit(features,response)
+    convNode = convNODENET( config.DIM_EMBEDDING,config.BATCH_SIZE,0.001,80,1,2,3,1,20)
+    convNode.fit()
