@@ -33,6 +33,7 @@ import data_util
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 device = 'cpu'
 
+is_print = False
 
 # Loads features and puts them into tensor form
 def load_features():
@@ -82,13 +83,17 @@ class ConcatConv2d(nn.Module):
         )
 
     def forward(self, t, x):
-        print('ConcatConv2d foward xshape', x.shape)
+        if is_print:
+            print('ConcatConv2d foward xshape', x.shape)
         tt = torch.ones_like(x[:, :1, :, :]) * t
-        print('ConcatConv2d foward 1', tt.shape)
+        if is_print:
+            print('ConcatConv2d foward 1', tt.shape)
         ttx = torch.cat([tt, x], 1)
-        print('ConcatConv2d foward 2', ttx.shape)
+        if is_print:
+            print('ConcatConv2d foward 2', ttx.shape)
         l = self._layer(ttx)
-        print('Layer ttx')
+        if is_print:
+            print('Layer ttx')
         return l
 
 
@@ -100,8 +105,8 @@ class ODEFunc(nn.Module):
         # self.conv1 = nn.Conv2d(in_channels=1,out_channels=num_filters,kernel_size=[kern1,emb_size])
         # self.conv2 = nn.Conv2d(in_channels=1,out_channels=num_filters,kernel_size=[kern2,emb_size])
         # self.conv3 = nn.Conv2d(in_channels=1,out_channels=num_filters,kernel_size=[kern3,emb_size])
-
-        print(f'input: {num_filters}, {kern1}')
+        if is_print:
+            print(f'input: {num_filters}, {kern1}')
 
         self.conv1 = ConcatConv2d(1, num_filters, ksize=[kern1, config.DIM_EMBEDDING])
         self.conv2 = ConcatConv2d(1, num_filters,ksize=[kern2, config.DIM_EMBEDDING])
@@ -134,18 +139,22 @@ class ODEFunc(nn.Module):
         # print(out.shape)
         # out = out.view(out.size(0),-1)
         # print('1', out.shape)
-        print('conv1')
+        if is_print:
+            print('conv1')
         x1 = self.conv1(t, x)
-        print('conv2')
+        if is_print:
+            print('conv2')
         x2 = self.conv2(t, x)
-        print('conv3')
+        if is_print:
+            print('conv3')
         x3 = self.conv3(t, x)
 
         out = torch.cat([x1,x2,x3],2) # shape is (input_size*3,num_filters)
         #out = out.view(out.size(0),-1)
 
-        print('Did out work?', x1.shape)
-        print(out.shape)
+        if is_print:
+            print('Did out work?', x1.shape)
+            print(out.shape)
         
         return x1
 
@@ -161,7 +170,8 @@ class ODEBlock(nn.Module): # adapted from rtqichen
         self.integration_time = self.integration_time.type_as(x)
         
         out = odeint_adjoint(self.odefunc, x, self.integration_time)
-        print('pls halp', len(out[1]))
+        if is_print:
+            print('pls halp', len(out[1]))
         return out[1]
 
 
