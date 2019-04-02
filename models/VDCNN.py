@@ -24,23 +24,23 @@ warnings.filterwarnings("ignore") # fuck warnings
 
 # Sets to GPU if possible
 # Might be wrong device name for gpu
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu') # Cudacris goin in on the beat
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu') # Cudacris goin in on the verse // cause I never use cpu and I won't start now
       
-def subBlock(num_filters, ksize):
+def subBlock(input_size, num_filters, ksize):
     '''
     For VDCNN, each convolution block is defined by its
     '''
-    return [nn.Conv1d(in_channels=num_filters, # iterates over each row in the input. Think as if it is iterating over each embedding
+    return [nn.Conv1d(in_channels=input_size, # iterates over each row in the input. Think as if it is iterating over each embedding
                                    out_channels=num_filters, 
                                    kernel_size=ksize),
             nn.BatchNorm1d(num_features=num_filters),
             nn.LeakyReLU(inplace=True)] # Original papers use ReLU, LeakyRelU makes sure the differentiation for negative values is not zero, but rather a very low value. Helps with vanishing gradient problem
             
-def TempConvBlock(num_filters, ksize):
-    return [*subBlock(num_filters,ksize),
-            *subBlock(num_filters,ksize)]
+def TempConvBlock(input_size, num_filters, ksize):
+    return [*subBlock(input_size, num_filters,ksize),
+            *subBlock(num_filters, num_filters,ksize)]
 
-def createBlock(blockFunc,num_filters,ksize,blockSize):
+def createBlock(blockFunc,input_size,num_filters,ksize,blockSize):
     '''
     Creates a VDCNN Block where blockSize is the number of TempConvBlocks in the block
     
@@ -53,8 +53,12 @@ def createBlock(blockFunc,num_filters,ksize,blockSize):
     
     return [blockFunc,blockFunc,blockFunc]
     '''
+
+    block = [*blockFunc(input_size, num_filters,ksize)]
     
-    return [*blockFunc(num_filters,ksize)]*blockSize
+    block.extend([*blockFunc(num_filters,num_filters,ksize)]*blockSize)
+    
+    return block
     
 
 def fc(num_input,num_output):
@@ -67,13 +71,11 @@ def fc(num_input,num_output):
 #    return x.gather(dim, index)
 
 class kmax_pooling(nn.Module):
-    def __init__(self,dim,k):
+    def __init__(self,k):
         super(kmax_pooling,self).__init__()
-        self.dim = dim
         self.k = k
     def forward(self,x):
-      index = x.topk(self.k, dim = self.dim)[1].sort(dim = self.dim)[0]
-      return x.gather(self.dim, index)  
+        return x.topk(self.k)[0].view(1,-1)
     
 class VDCNN:
     
@@ -88,32 +90,37 @@ class VDCNN:
         '''
         self.lr = lr
         self.epochs = epochs
-        self.model = nn.Sequential(nn.Conv1d(in_channels=771,
+        self.model = nn.Sequential(nn.Conv1d(in_channels=config.DIM_EMBEDDING,
                                              out_channels=filters[0],
-                                             kernel_size=ksize),
+                                             kernel_size=ksize,
+                                             padding=ksize-2),
                                     *createBlock(blockFunc=blockFunc,
-                                                 num_filters=filters[0],
-                                                 ksize=ksize,
-                                                 blockSize=blockSize),
-                                    nn.MaxPool1d(kernel_size=3, stride=2),
-                                    *createBlock(blockFunc=blockFunc,
+                                                 input_size=filters[0],
                                                  num_filters=filters[1],
                                                  ksize=ksize,
                                                  blockSize=blockSize),
                                     nn.MaxPool1d(kernel_size=3, stride=2),
                                     *createBlock(blockFunc=blockFunc,
+                                                 input_size = filters[1],
                                                  num_filters=filters[2],
                                                  ksize=ksize,
                                                  blockSize=blockSize),
                                     nn.MaxPool1d(kernel_size=3, stride=2),
                                     *createBlock(blockFunc=blockFunc,
+                                                 input_size=filters[2],
                                                  num_filters=filters[3],
                                                  ksize=ksize,
                                                  blockSize=blockSize),
-                                    kmax_pooling(dim=3,k=kmax),
-                                    *fc(fc_inputs[0],fc_inputs[1]), #inputs kmax * filters[3] output kmax * filters[3] / 2
-                                    *fc(fc_inputs[1],fc_inputs[1]),
-                                    nn.Linear(fc_inputs[1],numClasses)
+                                    nn.MaxPool1d(kernel_size=3, stride=2),
+                                    *createBlock(blockFunc=blockFunc,
+                                                 input_size=filters[3],
+                                                 num_filters=filters[3],
+                                                 ksize=ksize,
+                                                 blockSize=blockSize),
+                                    kmax_pooling(k=kmax),
+                                    *fc(kmax*filters[3],(kmax*filters[3])//2), #inputs kmax * filters[3] output kmax * filters[3] / 2
+                                    *fc((kmax*filters[3])//2,(kmax*filters[3])//2),
+                                    nn.Linear((kmax*filters[3])//2,numClasses)
                                     ).to(device)
     def fit(self,name):
         
@@ -141,7 +148,7 @@ class VDCNN:
     
                 y = Variable(torch.LongTensor([y]), requires_grad=False).to(device)
 
-
+                X = X.squeeze().t().unsqueeze(0)
                 print(X.shape)
                 optimizer.zero_grad()
                 y_pred = self.model(X)
