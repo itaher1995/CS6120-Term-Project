@@ -12,17 +12,17 @@ import config
 def load_data(partition='train'):
 
 
-	# Loads Sentence vectors
-	with open('data/sent_embds.pkl', 'rb') as f:
-		data = pickle.load(f)
-		# Gets metadata
-		metadata = pd.read_pickle('data/newsgroup_map.pkl')
+    # Loads Sentence vectors
+    with open('../data/sent_embds.pkl', 'rb') as f:
+        data = pickle.load(f)
+        # Gets metadata
+        metadata = pd.read_pickle('../data/newsgroup_map.pkl')
 
-	idx_subset = metadata[metadata.partition == partition]['idx_map'].tolist()
+    idx_subset = metadata[metadata.partition == partition]['idx_map'].tolist()
+    
+    dataloader = DataLoader(np.array(data)[idx_subset].tolist(), batch_size=config.BATCH_SIZE)	
 
-	dataloader = DataLoader(np.array(data)[idx_subset].tolist(), batch_size=config.BATCH_SIZE)	
-
-	return dataloader
+    return dataloader,len(idx_subset)
 
 
 # Takens straight from odenet_mnist.py in torchdiffeq project
