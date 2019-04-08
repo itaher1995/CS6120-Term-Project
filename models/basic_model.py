@@ -54,7 +54,7 @@ class FFN:
 
     def fit(self,name):
         
-        optimizer = optim.SGD(self.model.parameters(),lr=self.lr,momentum=0.4)
+        optimizer = optim.Adam(self.model.parameters(),lr=self.lr)
         loss = nn.CrossEntropyLoss() # cross-entropy loss
         lossVal = []
         for i in range(self.epochs):
@@ -88,6 +88,7 @@ class FFN:
 
                 output.backward()
                 optimizer.step()
+                #print(list(self.model.parameters()))
             
             for k in range(val_size):
                 X, y = data_iter.__next__()
@@ -139,10 +140,14 @@ class FFN:
 
 if __name__=='__main__':
     #filters,fc_inputs,poolStride,blockFunc,blockSize,kmax,numClasses,lr,epochs
-    model = FFN(hidden_size = 20,
-                  numClasses=20,
-                  lr=0.001,
-                  epochs=4)
-    print('start')
-    model.fit(name='default_run')
-    print(model.score())
+    hiddenSize = [5,10,15,20,25,50,75,100]
+
+    for i in range(len(hiddenSize)):
+        print(f'-------starting grid search {i}----------')
+        model = FFN(hidden_size = hiddenSize[i],
+                      numClasses=20,
+                      lr=0.01,
+                      epochs=50)
+        print('start')
+        model.fit(name=f'default_run{i}')
+    #print(model.score())
