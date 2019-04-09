@@ -51,7 +51,10 @@ def main():
 
 	data.data = data.data.apply(clean_string)
 
-	data.to_pickle('../data/newsgroup.pkl')
+	vectorizer = CountVectorizer(max_features = 1500)
+	data['CV_features'] = vectorizer.fit_transform(data.data.tolist()).toarray().tolist()
+
+	data.to_pickle('../data/newsgroup_CV.pkl')
 
 if __name__ == "__main__":
 	main()

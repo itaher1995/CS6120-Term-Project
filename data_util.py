@@ -9,10 +9,18 @@ import config
 
 # Loads features and puts them into tensor form
 # Takes train or test partition
-def load_data(partition='train'):
+def load_data(partition='train', processing='CV'):
 
 
     # Loads Sentence vectors
+    if processing == 'CV':
+        with open('../data/newsgroup_CV.pkl', 'rb') as f:
+            data = pickle.load(f)
+        
+        dataloader = DataLoader(data[['CV_features', 'target']].values.tolist())#, batch_size=config.BATCH_SIZE)
+        return dataloader, len(data)
+
+
     with open('../data/sent_embds.pkl', 'rb') as f:
         data = pickle.load(f)
         # Gets metadata
