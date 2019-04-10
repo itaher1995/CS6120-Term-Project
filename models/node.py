@@ -124,7 +124,8 @@ class FFN:
         '''
         self.lr = lr
         self.epochs = epochs
-        
+        self.hidden_size
+
         input_layer = nn.Linear(config.DIM_EMBEDDING, hidden_size)
         hidden_layers = PLISWORK_ODE(hidden_size)
         output_layer = nn.Linear(hidden_size, numClasses)
@@ -136,7 +137,7 @@ class FFN:
         optimizer = optim.Adam(self.model.parameters(),lr=self.lr)
         loss = nn.CrossEntropyLoss() # cross-entropy loss
         lossVal = []
-        bestLossVal=0
+        bestValAcc=0
         for i in range(self.epochs):
             start = time.time()
             loader,iteration = data_util.load_data()
@@ -189,8 +190,8 @@ class FFN:
                 epoch_val_loss.append(output.cpu().detach().numpy())
                 if y_pred.max(-1)[1]==y:
                     val_correct += 1
-            if save_weights and val_correct/val_size>bestLossAcc:
-                torch.save(self.model.state_dict(), f'../model_weights/FFN-Node{hidden_size}.pt')
+            if save_weights and val_correct/val_size>bestValAcc:
+                torch.save(self.model.state_dict(), f'../model_weights/FFN-Node{self.hidden_size}.pt')
 
             end = time.time()
             lossVal.append([(end-start)/60,np.mean(epoch_train_loss),np.mean(epoch_val_loss),train_correct/train_size,val_correct/val_size])
@@ -207,7 +208,7 @@ class FFN:
         
         data_iter = data_util.inf_generator(loader)
         correct = 0
-        for i in range(1):
+        for i in range(iteration):
             X, y = data_iter.__next__()
             
             X=[x.numpy()[0] for x in X] 
