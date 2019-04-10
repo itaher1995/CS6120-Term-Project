@@ -16,6 +16,8 @@ def load_data(partition='train', processing='CV'):
     if processing == 'CV':
         with open('../data/newsgroup_CV.pkl', 'rb') as f:
             data = pickle.load(f)
+
+        data = data[data.partition == partition]
         
         dataloader = DataLoader(data[['CV_features', 'target']].values.tolist())#, batch_size=config.BATCH_SIZE)
         return dataloader, len(data)
