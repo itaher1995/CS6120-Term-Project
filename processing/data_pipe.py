@@ -3,6 +3,7 @@ import numpy as np
 import re
 
 from sklearn.datasets import fetch_20newsgroups
+from sklearn.feature_extraction.text import CountVectorizer
 
 
 # Loads newsgroup 'train' or 'test' data and arranges into dataframe
@@ -24,10 +25,10 @@ def data_to_df(subset):
 
 
 def retrieve_data():
-	train = data_to_df('train')
+	train = data_to_df('train').sample(frac=1).reset_index(drop=True)
 	train['partition'] = 'train'   # Add partition to merge dataframes while keeping info seperate
 	
-	test = data_to_df('test')
+	test = data_to_df('test').sample(frac=1).reset_index(drop=True)
 	test['partition'] = 'test'   # Add partition to merge dataframes while keeping info seperate
 
 	data = pd.concat([train, test], axis = 0).reset_index(drop=True)
@@ -51,8 +52,23 @@ def main():
 
 	data.data = data.data.apply(clean_string)
 
+	training_data = data[data.partition == 'train']
+
+	train_idx = int(len(training_data) * .8)
+
+	train = training_data.iloc[0:train_idx, :]
+
+	vecs = []
+	
 	vectorizer = CountVectorizer(max_features = 1500)
-	data['CV_features'] = vectorizer.fit_transform(data.data.tolist()).toarray().tolist()
+	vecs += vectorizer.fit_transform(train.data.tolist()).toarray().tolist()
+
+	# Create new vectorizer using vocabulary from trainng set
+	vectorizer = CountVectorizer(max_features = 1500, vocabulary=list(vectorizer.vocabulary_.keys()))
+	vecs += vectorizer.fit_transform(training_data.iloc[train_idx:, :].data.tolist()).toarray().tolist()	# Validation set
+	vecs += vectorizer.fit_transform(data[data.partition == 'test'].data.tolist()).toarray().tolist()
+
+	data['CV_features'] = vecs
 
 	data.to_pickle('../data/newsgroup_CV.pkl')
 
