@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import re
-
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.datasets import fetch_20newsgroups
 
 
