@@ -124,7 +124,7 @@ class FFN:
         '''
         self.lr = lr
         self.epochs = epochs
-        self.hidden_size
+        self.hidden_size = hidden_size
 
         input_layer = nn.Linear(config.DIM_EMBEDDING, hidden_size)
         hidden_layers = PLISWORK_ODE(hidden_size)
@@ -133,7 +133,7 @@ class FFN:
 
 
     def fit(self,name,save_weights=False):
-        
+        print(name)
         optimizer = optim.Adam(self.model.parameters(),lr=self.lr)
         loss = nn.CrossEntropyLoss() # cross-entropy loss
         lossVal = []
@@ -190,11 +190,12 @@ class FFN:
                 epoch_val_loss.append(output.cpu().detach().numpy())
                 if y_pred.max(-1)[1]==y:
                     val_correct += 1
-            if save_weights and val_correct/val_size>bestValAcc:
-                torch.save(self.model.state_dict(), f'../model_weights/FFN-Node{self.hidden_size}.pt')
+                valAcc = val_correct/val_size
+            if save_weights and valAcc>bestValAcc:
+                torch.save(self.model.state_dict(), f'../model_weights/{name}.pt') # save if we do better than current best
 
             end = time.time()
-            lossVal.append([(end-start)/60,np.mean(epoch_train_loss),np.mean(epoch_val_loss),train_correct/train_size,val_correct/val_size])
+            lossVal.append([(end-start)/60,np.mean(epoch_train_loss),np.mean(epoch_val_loss),train_correct/train_size,val_correct/val_size]) # save values for reporting
             print('epoch time:',(end-start) / 60,'min','epoch:','{0}/{1}'.format(i,self.epochs),'train accuracy:',train_correct/train_size,', val accuracy:',val_correct/val_size)
             print(f'Train loss: {np.mean(epoch_train_loss)}		Val loss: {np.mean(epoch_val_loss)}')
         if 'model_train_results' not in os.listdir('../'):
@@ -205,7 +206,7 @@ class FFN:
 
     def score(self):
         loader, iteration = data_util.load_data(partition='test')
-        
+        #iteration = 1
         data_iter = data_util.inf_generator(loader)
         correct = 0
         for i in range(iteration):
@@ -222,6 +223,25 @@ class FFN:
                 correct += 1
         return correct/iteration
 
+    def test(self,name):
+        loader, iteration = data_util.load_data(partition='test')
+        #iteration = 1
+        data_iter = data_util.inf_generator(loader)
+        results = []
+        for i in range(iteration):
+            X, y = data_iter.__next__()
+            
+            X=[x.numpy()[0] for x in X] 
+            
+            predX = Variable(torch.FloatTensor([X]), requires_grad=True).to(device)
+            y = Variable(torch.LongTensor([y]), requires_grad=False).to(device)
+            
+            y_pred = self.model(predX)
+            
+            results.append([y.cpu().numpy()[0],y_pred.max(-1)[1].cpu().numpy()[0]])
+        pd.DataFrame(results,columns=['y_true','y_pred']).to_csv(f'../model_train_results/{name}.csv',index=False)
+
+
 
 if __name__=='__main__':
     #filters,fc_inputs,poolStride,blockFunc,blockSize,kmax,numClasses,lr,epochs
@@ -233,7 +253,8 @@ if __name__=='__main__':
         model = FFN(hidden_size = hiddenSize[i],
                       numClasses=20,
                       lr=0.01,
-                      epochs=10)
+                      epochs=15)
         print('start')
         model.fit(name=f'node_200',save_weights=True)
         print(model.score())
+        model.test(name='node_200_test')
