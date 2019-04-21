@@ -41,65 +41,64 @@ The scripts for the models are located in the **models** directory. In that dire
 
 **FFN**
 
-    Feedforward neural network implementation in PyTorch. 
+Feedforward neural network implementation in PyTorch. 
 
-    INPUTS: hidden_size - (int) number of neurons for each hidden layer
+INPUTS: hidden_size - (int) number of neurons for each hidden layer
         
-    numClasses - (int) number of classes for the model. In this it is 20.
+numClasses - (int) number of classes for the model. In this it is 20.
 
-    lr - (float) the learning rate for the model
+lr - (float) the learning rate for the model
 
-    epochs - (int) How many iterations will the model learn for.
+epochs - (int) How many iterations will the model learn for.
 
-    **fit**
+**fit**
 
-        Function to train the neural network.
+Function to train the neural network.
 
-        INPUTS: name - (str) filename for saving the file. Saves to csv. No file type needed.
+INPUTS: name - (str) filename for saving the file. Saves to csv. No file type needed.
+save_weights - Saves weights for this model post training.
 
-        save_weights - Saves weights for this model post training.
+**score**
 
-    **score**
+Will output the top 1 accuracy score for this model
 
-        Will output the top 1 accuracy score for this model
+**test**
 
-    **test**
+Will output model's top-1 predictions on a predefined test set.
 
-        Will output model's top-1 predictions on a predefined test set.
-
-        INPUTS: name - (str) filename for saving the file. Saves to csv. No file type needed.
+INPUTS: name - (str) filename for saving the file. Saves to csv. No file type needed.
 
 ### NODE
 
 **FFN**
 
-    Feedforward neural network implementation in PyTorch. 
+Feedforward neural network implementation in PyTorch. 
 
-    INPUTS: hidden_size - (int) number of neurons for each hidden layer
+INPUTS: hidden_size - (int) number of neurons for each hidden layer
         
-    numClasses - (int) number of classes for the model. In this it is 20.
+numClasses - (int) number of classes for the model. In this it is 20.
 
-    lr - (float) the learning rate for the model
+lr - (float) the learning rate for the model
 
-    epochs - (int) How many iterations will the model learn for.
+epochs - (int) How many iterations will the model learn for.
 
-    **fit**
+**fit**
 
-        Function to train the neural network.
+Function to train the neural network.
 
-        INPUTS: name - (str) filename for saving the file. Saves to csv. No file type needed.
+INPUTS: name - (str) filename for saving the file. Saves to csv. No file type needed.
 
-        save_weights - Saves weights for this model post training.
+save_weights - Saves weights for this model post training.
 
-    **score**
+**score**
 
-        Will output the top 1 accuracy score for this model
+Will output the top 1 accuracy score for this model
 
-    **test**
+**test**
 
-        Will output model's top-1 predictions on a predefined test set.
+Will output model's top-1 predictions on a predefined test set.
 
-        INPUTS: name - (str) filename for saving the file. Saves to csv. No file type needed.
+INPUTS: name - (str) filename for saving the file. Saves to csv. No file type needed.
 
 
 
