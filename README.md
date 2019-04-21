@@ -6,12 +6,19 @@ This is the github repository for **Text Classification Using Neural Ordinary Di
 In order for this code to run you will need the following:
 
 pandas >= 0.24.2
+
 numpy >= 1.13.3
+
 pickle
+
 time
+
 torch >= 1.0.1
+
 sys
+
 os
+
 warnings
 
 
