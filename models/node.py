@@ -1,5 +1,7 @@
 """
 Creates NODE model based on torchdiffeq for project document classification
+Many funcitons and structures heavily adapted from rtqichen/torchdiffeq github project
+https://github.com/rtqichen/torchdiffeq
 """
 
 
@@ -23,19 +25,9 @@ import config   # Read in hyperparameters from config so that we can control for
 import data_util
 import os
 
-# Get batch data
-
-# Create ODE network based on pytorch objects in ODEfunc class
-	# Needs to have at least __init__ and forward functions
-	# Where __init__ has the network declaration and forward has the forward propogation
-
 # Sets to GPU if possible
-# Might be wrong device name for gpu
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-#device = 'cpu'
-print(device)
 
-is_print = False
 
 tol = 1e-4
 
@@ -51,6 +43,9 @@ def onehot_encoder(y, num_classes):
 
 
 class ConcatLinear(nn.Module):
+    """
+    Creates the new type hidden layer that leverages NODE solver
+    """
 
     def __init__(self, hidden_size):
         super(ConcatLinear, self).__init__()
@@ -58,21 +53,16 @@ class ConcatLinear(nn.Module):
         self._layer = module(hidden_size + 1, hidden_size)
 
     def forward(self, t, x):
-        if is_print:
-            print('ConcatConv2d foward xshape', x.shape)
         tt = torch.ones_like(x[:, :1]) * t
-        if is_print:
-            print('ConcatConv2d foward 1', tt.shape)
         ttx = torch.cat([tt, x], 1)
-        if is_print:
-            print('ConcatConv2d foward 2', ttx.shape)
         l = self._layer(ttx)
-        if is_print:
-            print(f'Layer ttx {l.shape}')
         return l
 
 
 class ODEFunc(nn.Module):
+    """
+    Class that holds NODE layer structure
+    """
     
     def __init__(self, hidden_size):
         super().__init__()
@@ -81,6 +71,9 @@ class ODEFunc(nn.Module):
         self.l2 = ConcatLinear(hidden_size)
 
     def forward(self, t, x):
+        """
+        Takes in integration time argument (t) in addition to data (x)
+        """
 
         out = F.relu(self.l1(t, x))
         out = F.sigmoid(self.l2(t, out))
@@ -100,14 +93,10 @@ class PLISWORK_ODE(nn.Module): # adapted from rtqichen
         
     def forward(self, x):
         self.integration_time = self.integration_time.type_as(x)
-        
-        out = odeint_adjoint(self.odefunc, x, self.integration_time, rtol=tol, atol=tol)
-        if is_print:
-            print('pls halp', len(out[1]))
-        #print(out[1].shape)
 
-        #out = out[1].view(out[1].size(0),-1).t()
-        #out = out[1].view(out[1].size(-1), 1)
+        # Actual ODE solver used in forward propogation
+        out = odeint_adjoint(self.odefunc, x, self.integration_time, rtol=tol, atol=tol)
+
         return out[1]
 
 
@@ -115,27 +104,39 @@ class FFN:
     
     def __init__(self,hidden_size, numClasses,lr,epochs):
         '''
-        Creates VDCNN Architecture
+        Creates NODE Architecture
         
-        ksize: kernel size (int)
-        filters: list of number of filters (list)
-        poolStride: stride size for pooling layers (int)
-        blockFunc: TempConvBlock or ODEBlock
+        hidden_size: number of nodes in each hidden layer (int)
+        numClasses: number of classes for output (int)
+        lr: learning rate (int)
+        epochs: number of epochs (int)
         '''
         self.lr = lr
         self.epochs = epochs
         self.hidden_size = hidden_size
 
+        # Creates input layer for model
         input_layer = nn.Linear(config.DIM_EMBEDDING, hidden_size)
+        # Creates two hidden layers with ODE solver
         hidden_layers = PLISWORK_ODE(hidden_size)
+        # Creates output layer from hidden layers
         output_layer = nn.Linear(hidden_size, numClasses)
+        # Strings models togeather in fully connected sequence
         self.model = nn.Sequential(input_layer, hidden_layers, output_layer).to(device)
 
 
     def fit(self,name,save_weights=False):
-        print(name)
+        '''
+        Trains model using predefined number of epochs, learning rate and number of neurons in
+        each hidden layer. Saves epoch results to a file name.csv, where name is replaced with the
+        value put in for the name parameter.
+        
+        name: (str) The name of the file to save the results of this run
+        save_weights: (bool) Saves the weights of the best iteration based on validation accuracy
+        '''
+
         optimizer = optim.Adam(self.model.parameters(),lr=self.lr)
-        loss = nn.CrossEntropyLoss() # cross-entropy loss
+        loss = nn.CrossEntropyLoss() 
         lossVal = []
         bestValAcc=0
         for i in range(self.epochs):
@@ -150,21 +151,21 @@ class FFN:
             val_correct = 0
 
             c = 0
-            for j in range(train_size): #calculated train size to do train dev split will calculate mean loss at end
+            for j in range(train_size): 
                 X, y = data_iter.__next__()
 
                 X=[x.numpy()[0] for x in X] 
-                
     
-                X = Variable(torch.FloatTensor([X]), requires_grad=True).to(device) # have to convert to tensor
-                #print(X.shape)
+                X = Variable(torch.FloatTensor([X]), requires_grad=True).to(device)
     
                 y = Variable(torch.LongTensor([y]), requires_grad=False).to(device)
 
                 optimizer.zero_grad()
+
                 y_pred = self.model(X)
                 output = loss(y_pred, y)
                 epoch_train_loss.append(output.cpu().detach().numpy())
+
                 if y_pred.max(-1)[1]==y:
                     train_correct += 1
 
@@ -174,7 +175,6 @@ class FFN:
                 if not c % 1000:
                 	print('train time:',(time.time()-start) / 60,'min', c, 'loops')
                 c+=1
-                #print(list(self.model.parameters()))
             
             for k in range(val_size):
                 X, y = data_iter.__next__()
@@ -206,7 +206,7 @@ class FFN:
 
     def score(self):
         loader, iteration = data_util.load_data(partition='test')
-        #iteration = 1
+        
         data_iter = data_util.inf_generator(loader)
         correct = 0
         for i in range(iteration):
@@ -224,8 +224,12 @@ class FFN:
         return correct/iteration
 
     def test(self,name):
+        '''
+        Returns the top-1 accuracy on an unseen test dataset.
+        '''
+
         loader, iteration = data_util.load_data(partition='test')
-        #iteration = 1
+        
         data_iter = data_util.inf_generator(loader)
         results = []
         for i in range(iteration):
@@ -244,8 +248,6 @@ class FFN:
 
 
 if __name__=='__main__':
-    #filters,fc_inputs,poolStride,blockFunc,blockSize,kmax,numClasses,lr,epochs
-    #hiddenSize = [5,10,15,20,25,50,75,100]
     hiddenSize = [200]
     for i in range(len(hiddenSize)):
         print(f'-------starting grid search {i}----------')
