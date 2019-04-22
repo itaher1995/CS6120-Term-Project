@@ -17,9 +17,15 @@ def load_data(partition='train', processing='CV'):
         with open('../data/newsgroup_CV.pkl', 'rb') as f:
             data = pickle.load(f)
 
+        # Creates sample of data
+        if config.IS_SAMPLE:
+            train_samp = data[data.partition == 'train'].sample(frac=config.SAMPLE_FRAC, random_state=1)
+            test_samp = data[data.partition == 'test'].sample(frac=config.SAMPLE_FRAC, random_state=1)
+            data = pd.concat([train_samp, test_samp], ignore_index=True).reset_index(drop=True)
+
         data = data[data.partition == partition]
         
-        dataloader = DataLoader(data[['CV_features', 'target']].values.tolist())#, batch_size=config.BATCH_SIZE)
+        dataloader = DataLoader(data[['CV_features', 'target']].values.tolist())
         return dataloader, len(data)
 
 
