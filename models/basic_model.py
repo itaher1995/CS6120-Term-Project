@@ -18,9 +18,13 @@ import config
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu') # Cudacris goin in on the verse // cause I never use cpu and I won't start now
 
 class PLISWORK(nn.Module):
+    '''
+    Feed-forward neural network blocks. Created this class in order to inter-
+    change these blocks and ODE blocks.
+    '''
     def __init__(self, hidden_size):
         super(PLISWORK, self).__init__()
-        self.l1 = nn.Linear(hidden_size, hidden_size)
+        self.l1 = nn.Linear(hidden_size, hidden_size) # hidden layers
         self.l2 = nn.Linear(hidden_size, hidden_size)
 
 
@@ -37,12 +41,12 @@ class FFN:
     
     def __init__(self,hidden_size, numClasses,lr,epochs):
         '''
-        Creates VDCNN Architecture
+        Creates FFN architecture
         
-        ksize: kernel size (int)
-        filters: list of number of filters (list)
-        poolStride: stride size for pooling layers (int)
-        blockFunc: TempConvBlock or ODEBlock
+        hidden_size: (int) number of neurons per hidden layer
+        numClasses: (int) number of classes
+        lr: (float) Learning rate
+        epochs: (int) number of iterations the model learns on.
         '''
         self.lr = lr
         self.epochs = epochs
@@ -54,18 +58,26 @@ class FFN:
 
 
     def fit(self,name,save_weights=False):
+        '''
+        Trains model using predefined number of epochs, learning rate and number of neurons in
+        each hidden layer. Saves epoch results to a file name.csv, where name is replaced with the
+        value put in for the name parameter.
+        
+        name: (str) The name of the file to save the results of this run
+        save_weights: (bool) Saves the weights of the best iteration based on validation accuracy
+        '''
         print(name)
         optimizer = optim.Adam(self.model.parameters(),lr=self.lr)
         loss = nn.CrossEntropyLoss() # cross-entropy loss
-        lossVal = []
-        bestValAcc=0
+        lossVal = [] # to create dataframe for logging
+        bestValAcc=0 # to check for saving weights
         for i in range(self.epochs):
             start = time.time()
             loader,iteration = data_util.load_data()
-            data_iter = data_util.inf_generator(loader)
-            train_size = int(iteration*0.8)
+            data_iter = data_util.inf_generator(loader) # inf generator taken from rtiqchen implementation of NODE
+            train_size = int(iteration*0.8) # takes 80% of data as train and 20 as test
             val_size = int(iteration*0.2)
-            epoch_train_loss = []
+            epoch_train_loss = [] # collect values to update log for post-processing
             epoch_val_loss = []
             train_correct = 0
             val_correct = 0
@@ -85,7 +97,7 @@ class FFN:
                 y_pred = self.model(X)
                 output = loss(y_pred, y)
                 epoch_train_loss.append(output.cpu().detach().numpy())
-                if y_pred.max(-1)[1]==y:
+                if y_pred.max(-1)[1]==y: # if max log softmax corresponds to correct class add 1
                     train_correct += 1
 
                 output.backward()
@@ -105,7 +117,7 @@ class FFN:
                 y_pred = self.model(X)
                 output = loss(y_pred, y)
                 epoch_val_loss.append(output.cpu().detach().numpy())
-                if y_pred.max(-1)[1]==y:
+                if y_pred.max(-1)[1]==y: # if max log softmax corresponds to correct class add 1
                     val_correct += 1
                 valAcc = val_correct/val_size
             if save_weights and valAcc>bestValAcc:
@@ -122,6 +134,9 @@ class FFN:
 
 
     def score(self):
+        '''
+        Returns the top-1 accuracy on an unseen test dataset.
+        '''
         loader, iteration = data_util.load_data(partition='test')
         #iteration = 1
         data_iter = data_util.inf_generator(loader)
@@ -136,11 +151,16 @@ class FFN:
             
             y_pred = self.model(predX)
             
-            if y_pred.max(-1)[1]==y:
+            if y_pred.max(-1)[1]==y: # if class corresponding to max log softmax is the ground truth class 
                 correct += 1
         return correct/iteration
 
     def test(self,name):
+        '''
+        Takes a supposedly unseen dataset and finds the top-1 predicted labels.
+        Stores those values in a csv file called name.csv, where name is the value
+        set for the name parameter for this function.
+        '''
         loader, iteration = data_util.load_data(partition='test')
         #iteration = 1
         data_iter = data_util.inf_generator(loader)
@@ -160,17 +180,19 @@ class FFN:
 
 if __name__=='__main__':
     #filters,fc_inputs,poolStride,blockFunc,blockSize,kmax,numClasses,lr,epochs
-    #hiddenSize = [5,10,15,20,25,50,75,100]
+    hiddenSize = [5,10,15,20,25,50,75,100]
 
-    # for i in range(len(hiddenSize)):
-    #     print(f'-------starting grid search {i}----------')
-    #     model = FFN(hidden_size = hiddenSize[i],
-    #                   numClasses=20,
-    #                   lr=0.01,
-    #                   epochs=15)
-    #     print('start')
-    #     model.fit(name=f'default_run{i}')
-    #print(model.score())
+    for i in range(len(hiddenSize)):
+        print(f'-------starting grid search {i}----------')
+        model = FFN(hidden_size = hiddenSize[i],
+                    numClasses=20,
+                    lr=0.01,
+                    epochs=15)
+        print('start')
+        model.fit(name=f'default_run{i}')
+        print(model.score())
+    
+    # best model by default was 200 neurons
     model = FFN(hidden_size = 200,
                   numClasses=20,
                   lr=0.01,
