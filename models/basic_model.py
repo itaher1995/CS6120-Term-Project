@@ -180,7 +180,7 @@ class FFN:
 
 if __name__=='__main__':
     #filters,fc_inputs,poolStride,blockFunc,blockSize,kmax,numClasses,lr,epochs
-    hiddenSize = [5,10,15,20,25,50,75,100]
+    hiddenSize = [50,75,100,200]
 
     for i in range(len(hiddenSize)):
         print(f'-------starting grid search {i}----------')
