@@ -108,9 +108,9 @@ Will output model's top-1 predictions on a predefined test set.
 INPUTS: name - (str) filename for saving the file. Saves to csv. No file type needed.
 
 
-# Vizulizations
+# Visualizations
 
-We have included the vizualizations for the paper in experiment.ipynb
+We have included the visualizations for the paper in experiment.ipynb
 
 
 
